@@ -1,0 +1,13 @@
+import express from 'express';
+import { readDb } from '../db.js';
+import { requireAuth } from '../auth.js';
+
+const router = express.Router();
+
+router.get('/', requireAuth, async (req, res) => {
+  const db = await readDb();
+  const user = db.users.find((item) => item.id === req.user.id);
+  return res.json({ wallet: user.wallet, userId: user.id });
+});
+
+export default router;
