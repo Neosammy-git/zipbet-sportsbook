@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace @zipbet/frontend\" \"npm run dev --workspace @zipbet/backend\"",
     "build": "npm run build --workspace @zipbet/frontend",
-    "start": "npm run start --workspace @zipbet/backend"
+    "start": "npm run start --workspace @zipbet/backend",
+    "vercel-build": "npm run build"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
