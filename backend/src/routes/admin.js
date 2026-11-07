@@ -1,71 +1,60 @@
 import express from 'express';
 import { readDb, writeDb } from '../db.js';
-import { requireAuth } from '../auth.js';
+import { requireAdmin } from '../auth.js';
 
 const router = express.Router();
+router.use(requireAdmin);
 
-router.get('/', requireAuth, async (req, res) => {
-  const db = await readDb();
-  const bets = db.bets.filter((bet) => bet.userId === req.user.id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  return res.json(bets);
+router.post('/fixtures', async (req, res, next) => {
+  try {
+    const { homeTeam, awayTeam, league, kickoffAt } = req.body || {};
+    const odds = [Number(req.body?.homeOdds), Number(req.body?.drawOdds), Number(req.body?.awayOdds)];
+    const date = new Date(kickoffAt);
+    if (![homeTeam, awayTeam, league].every((value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 80) || !Number.isFinite(date.getTime()) || date <= new Date() || odds.some((value) => !Number.isFinite(value) || value <= 1 || value > 1000)) {
+      return res.status(400).json({ error: 'Provide valid team/league names, a future kickoff time, and decimal odds greater than 1.' });
+    }
+    const db = await readDb();
+    const id = Math.max(0, ...db.matches.map((match) => match.id)) + 1;
+    const match = { id, homeTeam: homeTeam.trim(), awayTeam: awayTeam.trim(), league: league.trim(), kickoffAt: date.toISOString(), homeOdds: odds[0], drawOdds: odds[1], awayOdds: odds[2], status: 'upcoming', winner: null, createdAt: new Date().toISOString() };
+    db.matches.push(match);
+    await writeDb(db);
+    return res.status(201).json({ match });
+  } catch (error) { return next(error); }
 });
 
-router.post('/', requireAuth, async (req, res) => {
-  const { matchId, selection, stake } = req.body || {};
+router.post('/settle', async (req, res, next) => {
+  try {
+    const matchId = Number(req.body?.matchId);
+    const winner = req.body?.winner;
+    if (!Number.isSafeInteger(matchId) || !['home', 'draw', 'away', 'void'].includes(winner)) return res.status(400).json({ error: 'Choose a valid match and outcome (home, draw, away, or void).' });
+    const db = await readDb();
+    const match = db.matches.find((item) => item.id === matchId);
+    if (!match) return res.status(404).json({ error: 'Match not found.' });
+    if (match.status === 'completed') return res.status(409).json({ error: 'This match has already been settled.' });
 
-  if (!matchId || !selection || !stake) {
-    return res.status(400).json({ error: 'Match, selection, and stake are required.' });
-  }
-
-  const db = await readDb();
-  const match = db.matches.find((item) => item.id === Number(matchId));
-
-  if (!match) {
-    return res.status(404).json({ error: 'Match not found' });
-  }
-
-  const user = db.users.find((item) => item.id === req.user.id);
-  const parsedStake = Number(stake);
-
-  if (parsedStake <= 0 || Number.isNaN(parsedStake)) {
-    return res.status(400).json({ error: 'Stake must be a positive number.' });
-  }
-
-  if (user.wallet.balance < parsedStake) {
-    return res.status(400).json({ error: 'Insufficient wallet balance.' });
-  }
-
-  const oddsMap = {
-    home: match.homeOdds,
-    draw: match.drawOdds,
-    away: match.awayOdds,
-  };
-
-  const odds = oddsMap[selection];
-  if (!odds) {
-    return res.status(400).json({ error: 'Invalid selection.' });
-  }
-
-  const payout = Math.round(parsedStake * odds);
-
-  const createdBet = {
-    id: Date.now(),
-    userId: user.id,
-    matchId: match.id,
-    selection,
-    stake: parsedStake,
-    odds,
-    payout,
-    status: 'open',
-    createdAt: new Date().toISOString(),
-  };
-
-  db.bets.push(createdBet);
-  user.wallet.balance = Number((user.wallet.balance - parsedStake).toFixed(2));
-
-  await writeDb(db);
-
-  return res.status(201).json({ bet: createdBet, wallet: user.wallet });
+    const bets = db.bets.filter((bet) => bet.matchId === matchId && bet.status === 'open');
+    for (const bet of bets) {
+      const user = db.users.find((item) => item.id === bet.userId);
+      if (!user) continue;
+      if (winner === 'void') {
+        user.wallet.balance += bet.stake;
+        bet.status = 'void';
+        bet.payout = bet.stake;
+      } else if (bet.selection === winner) {
+        bet.payout = Math.round(bet.stake * bet.odds);
+        user.wallet.balance += bet.payout;
+        bet.status = 'won';
+      } else {
+        bet.payout = 0;
+        bet.status = 'lost';
+      }
+      if (bet.payout > 0) db.walletTransactions.push({ id: `${bet.id}-settlement`, userId: user.id, type: bet.status === 'void' ? 'bet_refund' : 'bet_payout', amount: bet.payout, balanceAfter: user.wallet.balance, betId: bet.id, createdAt: new Date().toISOString() });
+    }
+    match.status = 'completed';
+    match.winner = winner;
+    match.settledAt = new Date().toISOString();
+    await writeDb(db);
+    return res.json({ success: true, settled: bets.length, winner, match });
+  } catch (error) { return next(error); }
 });
-
 export default router;

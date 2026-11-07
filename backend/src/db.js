@@ -1,35 +1,41 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { seedDb } from './seed.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const dataDir = path.join(__dirname, '..', 'data');
+const here = path.dirname(fileURLToPath(import.meta.url));
+const dataDir = process.env.DATA_DIR || path.resolve(here, '..', 'data');
 const dbPath = path.join(dataDir, 'db.json');
+let writeQueue = Promise.resolve();
 
 export async function ensureDb() {
-  try {
-    await fs.access(dataDir);
-  } catch {
-    await fs.mkdir(dataDir, { recursive: true });
-  }
-
+  await fs.mkdir(dataDir, { recursive: true });
   try {
     await fs.access(dbPath);
   } catch {
-    const seeded = seedDb();
-    await fs.writeFile(dbPath, JSON.stringify(seeded, null, 2), 'utf8');
+    await fs.writeFile(dbPath, JSON.stringify(seedDb(), null, 2), 'utf8');
   }
 }
 
 export async function readDb() {
   await ensureDb();
-  const raw = await fs.readFile(dbPath, 'utf8');
-  return JSON.parse(raw);
+  const data = JSON.parse(await fs.readFile(dbPath, 'utf8'));
+  data.users ||= [];
+  data.matches ||= [];
+  data.bets ||= [];
+  data.walletTransactions ||= [];
+  return data;
 }
 
-export async function writeDb(data) {
-  await ensureDb();
-  await fs.writeFile(dbPath, JSON.stringify(data, null, 2), 'utf8');
+// Serialize writes and replace the file atomically. This is suitable only for this
+// single-process demo; production-grade multi-instance apps need a transactional DB.
+export function writeDb(data) {
+  const nextWrite = writeQueue.then(async () => {
+    await ensureDb();
+    const tempPath = `${dbPath}.${process.pid}.tmp`;
+    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    await fs.rename(tempPath, dbPath);
+  });
+  writeQueue = nextWrite.catch(() => {});
+  return nextWrite;
 }

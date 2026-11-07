@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: zipbet-sportsbook
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: zipbet-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /opt/render/project/src/backend/data
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: FRONTEND_URL
+        value: https://zipbet-sportsbook.onrender.com

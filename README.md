@@ -1,90 +1,44 @@
-# ZIPBET Sportsbook
+# ZIPBET Sportsbook Demo
 
-A polished, simulated sportsbook demo built with:
-- Frontend: React + Vite
-- Backend: Express.js
-- Auth: JWT
-- Storage: JSON-based simulated database
-- Wallet: simulated balance management with settlement
-
-This project is for demo and learning purposes only. It is not a real-money gambling or payment system.
+ZIPBET is a deployable React + Vite frontend and Express API for a **virtual-credit-only sportsbook UI demo**. It has no real-money betting, deposits, withdrawals, or payment integrations. Sample odds are static illustrative data, not a live odds service.
 
 ## Features
-- Modern sportsbook landing page
-- Login and signup flows
-- Dashboard with wallet balance and recent bets
-- Live odds feed to simulate market activity
-- Match pages with market selection and stake input
-- Bet placement and settlement logic
-- Admin fixture creation and result settlement
-- Simulated wallet balance tracking and payouts
+- Responsive landing page, sports markets, match pages, authentication, user dashboard, and admin tools.
+- Express API for signup/login, fixtures, demo-credit bets, wallet history, and settlement.
+- Demo-credit wallet ledger, hashed passwords, JWT auth, rate-limited auth endpoints, and admin-only fixture/settlement routes.
+- Express serves the built Vite app, so one Render web service can host both frontend and API.
 
-## Tech stack
-- React
-- Vite
-- Express
-- JWT
-- CORS
-- JSON file persistence
+## Local run
+Requires Node.js 20+.
 
-## Repo structure
-
-```bash
-.
-├── backend/
-│   ├── src/
-│   ├── data/
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   ├── index.html
-│   └── package.json
-├── .env.example
-├── .gitignore
-├── package.json
-├── README.md
-└── LICENSE
-```
-
-## Quick start
-
-1. Install root dependencies:
-
-```bash
+```sh
 npm install
-```
-
-2. Copy environment example:
-
-```bash
-cp .env.example .env
-```
-
-3. Start both frontend and backend in development mode:
-
-```bash
 npm run dev
 ```
 
-The frontend runs at `http://localhost:5173` and the backend runs at `http://localhost:4000`.
+Open <http://localhost:5173>. API health: <http://localhost:4000/api/health>. Local demo admin: `demo@zipbet.com` / `Zipbet@123` (only seeded outside production). For a clean local database, delete `backend/data/db.json` and restart the API.
 
-## Environment variables
+Build and production start locally:
 
-```env
-PORT=4000
-JWT_SECRET=supersecret_zipbet_key
-FRONTEND_URL=http://localhost:5173
-VITE_API_BASE_URL=http://localhost:4000/api
+```sh
+npm run build
+npm start
 ```
 
-## Demo login
+## Deploy on Render
+1. Push this repository to GitHub and in Render choose **New → Blueprint**, then select the repository. Render reads `render.yaml` to create the Node web service and persistent disk.
+2. In the service environment, set `ADMIN_EMAIL` to the email address that will administer the demo. Create an account on the deployed site using that email; admin actions are authorized server-side. Do not set this to a public/shared account.
+3. Deploy. Visit the generated `*.onrender.com` service URL; `/api/health` should return `{"ok":true}`.
 
-A demo admin user is created automatically on first run:
+The blueprint generates a strong `JWT_SECRET`. Keep it private. The configured disk preserves JSON demo data across deploys/restarts; Render persistent disks require a paid service plan. Without a disk or external database, local filesystem data may be lost on redeploy and should be treated as disposable.
 
-- Email: demo@zipbet.com
-- Password: Zipbet@123
+### Render setup without Blueprint
+- Runtime: Node
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- Health check path: `/api/health`
+- Environment: `NODE_ENV=production`, `JWT_SECRET` (random, at least 32 characters), `ADMIN_EMAIL` (admin login email), `DATA_DIR=/opt/render/project/src/backend/data`
+- Add a persistent disk mounted at `/opt/render/project/src/backend/data` to retain simulated users and bets.
 
-## Notes
-
-- This project intentionally uses a simulated wallet and does not include real payments, KYC, or gambling regulation logic.
-- A production sportsbook requires licensing, compliance reviews, robust risk controls, and regulated payment integrations.
+## Important limitations
+This repository uses a single-process JSON file store intended for a small demo. Do not scale to multiple instances or treat it as financial, wagering, or production account software. Real-money gambling is not implemented. A real odds feed is not configured; replace the demo data through an appropriately licensed provider if your use case permits.

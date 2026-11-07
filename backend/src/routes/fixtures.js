@@ -1,29 +1,19 @@
 import express from 'express';
-import { requireAuth } from '../auth.js';
-import { readDb, writeDb } from '../db.js';
+import { readDb } from '../db.js';
 
 const router = express.Router();
-
-router.get('/', requireAuth, async (req, res) => {
-  const db = await readDb();
-  const user = db.users.find((item) => item.id === req.user.id);
-  return res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    wallet: user.wallet,
-  });
+router.get('/', async (_req, res, next) => {
+  try {
+    const db = await readDb();
+    res.json(db.matches.sort((a, b) => new Date(a.kickoffAt) - new Date(b.kickoffAt)));
+  } catch (error) { next(error); }
 });
-
-router.get('/profile', requireAuth, async (req, res) => {
-  const db = await readDb();
-  const user = db.users.find((item) => item.id === req.user.id);
-  return res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    wallet: user.wallet,
-  });
+router.get('/:id', async (req, res, next) => {
+  try {
+    const db = await readDb();
+    const match = db.matches.find((item) => item.id === Number(req.params.id));
+    if (!match) return res.status(404).json({ error: 'Match not found.' });
+    return res.json(match);
+  } catch (error) { return next(error); }
 });
-
 export default router;

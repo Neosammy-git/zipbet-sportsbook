@@ -1,14 +1,11 @@
 {
   "name": "zipbet-sportsbook",
   "private": true,
-  "workspaces": [
-    "frontend",
-    "backend"
-  ],
+  "workspaces": ["frontend", "backend"],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace frontend\" \"npm run dev --workspace backend\"",
-    "build": "npm run build --workspace frontend",
-    "start": "npm run start --workspace backend"
+    "dev": "concurrently \"npm run dev --workspace @zipbet/frontend\" \"npm run dev --workspace @zipbet/backend\"",
+    "build": "npm run build --workspace @zipbet/frontend",
+    "start": "npm run start --workspace @zipbet/backend"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
